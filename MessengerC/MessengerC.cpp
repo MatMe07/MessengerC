@@ -249,7 +249,7 @@ DWORD WINAPI client_worker(LPVOID lpParam) {
 
         EnterCriticalSection(&cs_clients);
         for (int i = 0; i < MAX_CLIENTS; i++) {
-            if (clients[i].is_active) {
+            if (clients[i].is_active && current_id != clients[i].id) {
                 send_response(clients[i].reply_slot_name, broadcast_payload);
             }
         }
@@ -297,13 +297,13 @@ DWORD WINAPI client_worker(LPVOID lpParam) {
         sprintf(log_buf, "Клиент %d: %s", current_id, command_data);
         save_to_common_history(log_buf);
 
-        EnterCriticalSection(&cs_clients);
-        for (int i = 0; i < MAX_CLIENTS; i++) {
-            if (clients[i].is_active && clients[i].id != current_id) {
-                send_response(clients[i].reply_slot_name, log_buf);
-            }
-        }
-        LeaveCriticalSection(&cs_clients);
+        //EnterCriticalSection(&cs_clients);
+        //for (int i = 0; i < MAX_CLIENTS; i++) {
+        //    if (clients[i].is_active && clients[i].id != current_id) {
+        //        send_response(clients[i].reply_slot_name, log_buf);
+        //    }
+        //}
+        //LeaveCriticalSection(&cs_clients);
     }
 
     free(raw_packet);
