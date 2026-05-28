@@ -70,8 +70,7 @@ DWORD WINAPI response_listener(LPVOID lpParam) {
                     printf("\nСессия закрыта. Выход из приложения...\n");
                     break;
                 }
-                if (strncmp(receive_buffer, "FILE_DATA:", 10) == 0) {
-                    // Формат: "FILE_DATA:filename|content"
+                else if (strncmp(receive_buffer, "FILE_DATA:", 10) == 0) {
                     char* data = receive_buffer + 10;
                     char* separator = strchr(data, '|');
 
@@ -95,10 +94,10 @@ DWORD WINAPI response_listener(LPVOID lpParam) {
                         }
                     }
                     fflush(stdout);
-                    continue;  
+                    continue;
                 }
 
-                if (strncmp(receive_buffer, "REG_OK:", 7) != 0) {
+                else if (strncmp(receive_buffer, "REG_OK:", 7) != 0) {
                     write_to_local_history(receive_buffer);
 
                     printf("\n%s\n> ", receive_buffer);
@@ -187,16 +186,7 @@ int main() {
             Sleep(400);
             break;
         }
-        else if (strlen(console_input) > 0) {
-            char self_log_buf[BUFFER_SIZE];
-            strcpy(self_log_buf, "[Вы]: ");
-            strcat(self_log_buf, console_input);
-
-            write_to_local_history(self_log_buf);
-
-            dispatch_packet(console_input);
-        }
-        if (strncmp(console_input, "SEND:", 5) == 0) {
+        else if (strncmp(console_input, "SEND:", 5) == 0) {
             char* filename = console_input + 5;
 
             HANDLE hFile = CreateFileA(filename, GENERIC_READ, FILE_SHARE_READ, NULL,
@@ -226,7 +216,18 @@ int main() {
         else if (strncmp(console_input, "GET:", 4) == 0) {
             char* filename = console_input + 4;
             dispatch_packet(console_input); 
+            //Sleep(100000);
+
             continue;
+        }
+        else if (strlen(console_input) > 0) {
+            char self_log_buf[BUFFER_SIZE];
+            strcpy(self_log_buf, "[Вы]: ");
+            strcat(self_log_buf, console_input);
+
+            write_to_local_history(self_log_buf);
+
+            dispatch_packet(console_input);
         }
         Sleep(50);
     }

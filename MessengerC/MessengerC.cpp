@@ -192,12 +192,42 @@ DWORD WINAPI client_worker(LPVOID lpParam) {
         char welcome[256];
         sprintf(welcome, "REG_OK:%d", current_id);
         send_response(client_slot, welcome);
+
     }
     LeaveCriticalSection(&cs_clients);
 
     char log_buf[BUFFER_SIZE];
 
-    if (strcmp(command_data, "exit") == 0) {
+     if (strncmp(command_data, "GET:", 4) == 0) {
+        char* filename = command_data + 4;
+        printf("[Сервер] Клиент %d запросил файл: %s\n", current_id, filename);
+
+        HANDLE hFile = CreateFileA(filename, GENERIC_READ, FILE_SHARE_READ, NULL,
+            OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+
+        if (hFile != INVALID_HANDLE_VALUE) {
+            char file_content[BUFFER_SIZE];
+            DWORD bytes_read;
+
+            if (ReadFile(hFile, file_content, BUFFER_SIZE - 100, &bytes_read, NULL)) {
+                file_content[bytes_read] = '\0';
+
+                char response[BUFFER_SIZE + 200];
+                sprintf(response, "FILE_DATA:%s|%s", filename, file_content);
+                send_response(client_slot, response);
+                //Sleep(1000);
+
+            }
+            CloseHandle(hFile);
+            printf("[Сервер] Файл '%s' отправлен клиенту %d\n", filename, current_id);
+        }
+        else {
+            send_response(client_slot, "ERROR: Файл не найден на сервере");
+            printf("[Сервер] Файл '%s' не найден\n", filename);
+        }
+
+    }
+    else if (strcmp(command_data, "exit") == 0) {
         sprintf(log_buf, "[СИСТЕМА] Клиент %d покинул чат.", current_id);
         save_to_common_history(log_buf);
 
@@ -235,9 +265,8 @@ DWORD WINAPI client_worker(LPVOID lpParam) {
         process_variant_task(filename, file_response);
         send_response(client_slot, file_response);
     }
-    else if (strncmp(command_data, "SEND:", 10) == 0) {
-        // Полная версия: "SEND_FILE:filename|content"
-        char* file_part = command_data + 10;
+    else if (strncmp(command_data, "SEND:", 5) == 0) {
+        char* file_part = command_data + 5;
         char* separator = strchr(file_part, '|');
 
         if (separator) {
@@ -245,7 +274,6 @@ DWORD WINAPI client_worker(LPVOID lpParam) {
             char* filename = file_part;
             char* content = separator + 1;
 
-            // Сохраняем файл на сервере
             HANDLE hFile = CreateFileA(filename, GENERIC_WRITE, 0, NULL,
                 CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 
@@ -263,32 +291,6 @@ DWORD WINAPI client_worker(LPVOID lpParam) {
             else {
                 send_response(client_slot, "ERROR: Не удалось сохранить файл");
             }
-        }
-    }
-    else if (strncmp(command_data, "GET:", 4) == 0) {
-        char* filename = command_data + 4;
-        printf("[Сервер] Клиент %d запросил файл: %s\n", current_id, filename);
-
-        HANDLE hFile = CreateFileA(filename, GENERIC_READ, FILE_SHARE_READ, NULL,
-            OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-
-        if (hFile != INVALID_HANDLE_VALUE) {
-            char file_content[BUFFER_SIZE];
-            DWORD bytes_read;
-
-            if (ReadFile(hFile, file_content, BUFFER_SIZE - 100, &bytes_read, NULL)) {
-                file_content[bytes_read] = '\0';
-
-                char response[BUFFER_SIZE + 200];
-                sprintf(response, "FILE_DATA:%s|%s", filename, file_content);
-                send_response(client_slot, response);
-            }
-            CloseHandle(hFile);
-            printf("[Сервер] Файл '%s' отправлен клиенту %d\n", filename, current_id);
-        }
-        else {
-            send_response(client_slot, "ERROR: Файл не найден на сервере");
-            printf("[Сервер] Файл '%s' не найден\n", filename);
         }
     }
     else {
@@ -341,6 +343,7 @@ int main() {
                 ThreadData[bytes_read] = '\0';
 
                 CreateThread(NULL, 0, client_worker, (LPVOID)ThreadData, 0, NULL);
+                //Sleep(1000);
             }
         }
         Sleep(20);
