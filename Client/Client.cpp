@@ -8,13 +8,14 @@
 
 char my_private_slot[256];
 char my_local_slot[256];
+char server_slot[256];
 char hostname[100];
 int my_assigned_id = 0;
 
 using namespace std;
 
 void dispatch_packet(const char* payload) {
-    HANDLE hFile = CreateFileA("\\\\.\\mailslot\\server_main", GENERIC_WRITE, FILE_SHARE_READ, NULL,
+    HANDLE hFile = CreateFileA(server_slot, GENERIC_WRITE, FILE_SHARE_READ, NULL,
         OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (hFile != INVALID_HANDLE_VALUE) {
         char raw_packet[BUFFER_SIZE];
@@ -119,19 +120,38 @@ int main() {
     SetConsoleCP(1251);
     SetConsoleOutputCP(1251);
     clear_history();
+    char serverHostName[100];
+    //char* newline;
+
+    printf("Введите Host Name сервера > ");
+    cin >> serverHostName;
+    //fgets(serverHostName, sizeof(serverHostName), stdin);
+
+    sprintf(server_slot, "\\\\%s\\mailslot\\server_main", serverHostName);
+    //sprintf(server_slot, "\\\\KB37-212-C07\\mailslot\\server_main");
+
     int CurrProcessId = (int)GetCurrentProcessId();
-    strcpy(hostname, ".");
+    //strcpy(hostname, "."); // 
+    printf("Введите свой Host Name > ");
+    cin >> hostname;
+
+    //fgets(hostname, BUFFER_SIZE, stdin);
+
+    //newline = strchr(hostname, '\n');
+    //if (newline != NULL) {
+    //    *newline = '\0';
+    //}
+
     strcpy(my_local_slot, "\\\\.\\mailslot\\client_");
     char pid_string[32];
     _itoa(CurrProcessId, pid_string, 10);
     strcat(my_local_slot, pid_string);
 
-    //sprintf(my_local_slot, "\\\\.\\mailslot\\client_%d", CurrProcessId);
 
     sprintf(my_private_slot, "\\\\%s\\mailslot\\client_%d", hostname, CurrProcessId);
 
 
-    HANDLE hMyMailslot = CreateMailslotA(my_private_slot, 0, MAILSLOT_WAIT_FOREVER, NULL);
+    HANDLE hMyMailslot = CreateMailslotA(my_local_slot, 0, MAILSLOT_WAIT_FOREVER, NULL);
     if (hMyMailslot == INVALID_HANDLE_VALUE) {
         printf("Не удалось инициализировать персональный клиентский ящик (%d)\n", GetLastError());
         return 1;
