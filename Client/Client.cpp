@@ -141,8 +141,9 @@ int main() {
     //if (newline != NULL) {
     //    *newline = '\0';
     //}
+    sprintf(my_local_slot, "\\\\%s\\mailslot\\server_main", serverHostName);
 
-    strcpy(my_local_slot, "\\\\.\\mailslot\\client_");
+    //strcpy(my_local_slot, "\\\\%s\\mailslot\\client_", hostname);
     char pid_string[32];
     _itoa(CurrProcessId, pid_string, 10);
     strcat(my_local_slot, pid_string);
