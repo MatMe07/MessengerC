@@ -152,7 +152,7 @@ int main() {
     sprintf(my_private_slot, "\\\\%s\\mailslot\\client_%d", hostname, CurrProcessId);
 
 
-    HANDLE hMyMailslot = CreateMailslotA(my_local_slot, 0, MAILSLOT_WAIT_FOREVER, NULL);
+    HANDLE hMyMailslot = CreateMailslotA(my_private_slot, 0, MAILSLOT_WAIT_FOREVER, NULL);
     if (hMyMailslot == INVALID_HANDLE_VALUE) {
         printf("Не удалось инициализировать персональный клиентский ящик (%d)\n", GetLastError());
         return 1;
