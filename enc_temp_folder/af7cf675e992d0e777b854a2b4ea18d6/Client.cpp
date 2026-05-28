@@ -79,8 +79,6 @@ DWORD WINAPI response_listener(LPVOID lpParam) {
                         *separator = '\0';
                         char* filename = data;
                         char* content = separator + 1;
-                        char self_log_buf[BUFFER_SIZE];
-
 
                         HANDLE hFile = CreateFileA(filename, GENERIC_WRITE, 0, NULL,
                             CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
@@ -89,17 +87,12 @@ DWORD WINAPI response_listener(LPVOID lpParam) {
                             DWORD written;
                             WriteFile(hFile, content, (DWORD)strlen(content), &written, NULL);
                             CloseHandle(hFile);
-                            sprintf(self_log_buf, "\n[Система] Файл '%s' получен от сервера (%d байт)\n> ", filename, written);
-                            printf(self_log_buf);
 
+                            printf("\n[Система] Файл '%s' получен от сервера (%d байт)\n> ", filename, written);
                         }
                         else {
                             printf("\n[Ошибка] Не удалось сохранить файл '%s'\n> ", filename);
-                            sprintf(self_log_buf, "\n[Ошибка] Не удалось сохранить файл '%s'\n> ", filename);
-                            printf(self_log_buf);
                         }
-                        write_to_local_history(self_log_buf);
-
                     }
                     fflush(stdout);
                     continue;
@@ -206,8 +199,6 @@ int main() {
         }
         else if (strncmp(console_input, "SEND:", 5) == 0) {
             char* filename = console_input + 5;
-            char self_log_buf[BUFFER_SIZE];
-
 
             HANDLE hFile = CreateFileA(filename, GENERIC_READ, FILE_SHARE_READ, NULL,
                 OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
@@ -222,25 +213,19 @@ int main() {
                     char packet[BUFFER_SIZE];
                     sprintf(packet, "SEND:%s|%s", filename, file_content);
                     dispatch_packet(packet);
-                    sprintf(self_log_buf, "[Система] Файл '%s' отправлен на сервер (%d байт)\n", filename, bytes_read);
-                    write_to_local_history(self_log_buf);
-                    printf(self_log_buf);
-                    //printf("[Система] Файл '%s' отправлен на сервер (%d байт)\n", filename, bytes_read);
+
+                    printf("[Система] Файл '%s' отправлен на сервер (%d байт)\n", filename, bytes_read);
                 }
                 CloseHandle(hFile);
             }
             else {
-                //printf("[Ошибка] Файл '%s' не найден\n", filename);
-                sprintf(self_log_buf, "[Ошибка] Файл '%s' не найден\n", filename);
-                write_to_local_history(self_log_buf);
-                printf(self_log_buf);
+                printf("[Ошибка] Файл '%s' не найден\n", filename);
             }
             continue;
         }
 
         else if (strncmp(console_input, "GET:", 4) == 0) {
             char* filename = console_input + 4;
-
             dispatch_packet(console_input); 
             //Sleep(100000);
 
