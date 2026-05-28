@@ -121,29 +121,19 @@ int main() {
     SetConsoleOutputCP(1251);
     clear_history();
     char serverHostName[100];
-    //char* newline;
 
     printf("Введите Host Name сервера > ");
     cin >> serverHostName;
-    //fgets(serverHostName, sizeof(serverHostName), stdin);
-
     sprintf(server_slot, "\\\\%s\\mailslot\\server_main", serverHostName);
-    //sprintf(server_slot, "\\\\KB37-212-C07\\mailslot\\server_main");
 
     int CurrProcessId = (int)GetCurrentProcessId();
-    //strcpy(hostname, "."); // 
     printf("Введите свой Host Name > ");
     cin >> hostname;
 
-    //fgets(hostname, BUFFER_SIZE, stdin);
 
-    //newline = strchr(hostname, '\n');
-    //if (newline != NULL) {
-    //    *newline = '\0';
-    //}
-    sprintf(my_local_slot, "\\\\%s\\mailslot\\server_main", serverHostName);
+    sprintf(my_local_slot, "\\\\.\\mailslot\\client_");
 
-    //strcpy(my_local_slot, "\\\\%s\\mailslot\\client_", hostname);
+
     char pid_string[32];
     _itoa(CurrProcessId, pid_string, 10);
     strcat(my_local_slot, pid_string);
@@ -152,7 +142,7 @@ int main() {
     sprintf(my_private_slot, "\\\\%s\\mailslot\\client_%d", hostname, CurrProcessId);
 
 
-    HANDLE hMyMailslot = CreateMailslotA(my_private_slot, 0, MAILSLOT_WAIT_FOREVER, NULL);
+    HANDLE hMyMailslot = CreateMailslotA(my_local_slot, 0, MAILSLOT_WAIT_FOREVER, NULL);
     if (hMyMailslot == INVALID_HANDLE_VALUE) {
         printf("Не удалось инициализировать персональный клиентский ящик (%d)\n", GetLastError());
         return 1;
