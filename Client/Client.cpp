@@ -73,7 +73,7 @@ DWORD WINAPI response_listener(LPVOID lpParam) {
                     printf("\nСессия закрыта. Выход из приложения...\n");
                     break;
                 }
-                else if (strncmp(receive_buffer, "FILE_DATA:", 10) == 0) {
+                else if (strncmp(receive_buffer, "FILE_оDATA:", 10) == 0) {
                     char* data = receive_buffer + 10;
                     char* separator = strchr(data, '|');
 

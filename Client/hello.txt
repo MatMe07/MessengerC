@@ -1,0 +1,44 @@
+2. Поддержка на стороне Сервера (server.c)Чтобы сервер умел собирать этот файл по кусочкам, замените вашу старую ветку else if (strncmp(command_data, "SEND:", 5) == 0) в функции client_worker на три новые ветки обработки:c    // А) Подготовка файла на сервере
+    else if (strncmp(command_data, "START_SEND:", 11) == 0) {
+        char* filename = command_data + 11;
+        
+        // CREATE_ALWAYS затрет старый файл или создаст новый пустой размером 0 байт
+        HANDLE hFile = CreateFileA(filename, GENERIC_WRITE, 0, NULL,
+            CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (hFile != INVALID_HANDLE_VALUE) {
+            CloseHandle(hFile);
+        }
+    }
+    // Б) Дозапись поступающих чанков (кусочков)
+    else if (strncmp(command_data, "CHUNKS_SEND:", 12) == 0) {
+        char* file_part = command_data + 12;
+        char* pipe_separator = strchr(file_part, '|');
+
+        if (pipe_separator) {
+            *pipe_separator = '\0';
+            char* filename = file_part;
+            char* content_chunk = pipe_separator + 1;
+
+            // OPEN_ALWAYS открывает файл, а FILE_APPEND_DATA переносит указатель в конец
+            HANDLE hFile = CreateFileA(filename, FILE_APPEND_DATA, FILE_SHARE_READ, NULL,
+                OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+
+            if (hFile != INVALID_HANDLE_VALUE) {
+                DWORD written;
+                // Дописываем кусочек данных в хвост файла
+                WriteFile(hFile, content_chunk, (DWORD)strlen(content_chunk), &written, NULL);
+                CloseHandle(hFile);
+            }
+        }
+    }
+    // В) Фиксация окончания загрузки большого файла
+    else if (strncmp(command_data, "END_SEND:", 9) == 0) {
+        char* filename = command_data + 9;
+        
+        char server_log[BUFFER_SIZE];
+        sprintf(server_log, "[ФАЙЛ] Клиент %d завершил загрузку файла '%s'", current_id, filename);
+        save_to_common_history(server_log);
+        
+        send_response(client_slot, "OK: Файл успешно загружен и собран на сервере");
+    }
+Используйте код с осторожностью.Важные архитектурные моменты:Задержка Sleep(30); на клиенте: Это самый важный элемент. Mailslot работает асинхронно. Если убрать Sleep, клиент выстрелит 100 пакетов за миллисекунду, и серверная функция GetMailslotInfo застрянет (пакеты перемешаются в кучу). Пауза в 30 мс гарантирует, что каждый кусочек текста дойдет в целости.Безопасность памяти: Поскольку размер file_chunk равен 1024 байтам, суммарный размер пакета CHUNKS_SEND:name.txt|данные никогда не превысит установленный BUFFER_SIZE (4096), что полностью страхует программу от падений и дублирования информации.Аналогичным образом (через цикл отправки чанков) можно переписать команду GET: на сервере, если клиенты будут часто скачивать файлы большого объема. Хотите модифицировать ветку скачивания GET: под большие файлы?

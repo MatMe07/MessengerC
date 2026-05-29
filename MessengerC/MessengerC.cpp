@@ -206,35 +206,29 @@ DWORD WINAPI client_worker(LPVOID lpParam) {
             OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 
         if (hFile != INVALID_HANDLE_VALUE) {
-            // А) Сигнализируем клиенту о старте передачи файла
             char start_response[BUFFER_SIZE];
             sprintf(start_response, "START_GET:%s", filename);
             send_response(client_slot, start_response);
-            Sleep(30); // Даем клиенту время подготовить файл
+            Sleep(30); 
 
-            // Блок данных делаем небольшим (например, 1024 байта), чтобы он гарантированно пролез в лимиты Mailslot
+            
             char file_chunk[1024];
             DWORD bytes_read;
             DWORD total_bytes_sent = 0;
 
-            // Б) Циклически читаем большой файл мелкими частями и отправляем
             while (ReadFile(hFile, file_chunk, sizeof(file_chunk) - 1, &bytes_read, NULL) && bytes_read > 0) {
-                file_chunk[bytes_read] = '\0'; // Закрываем строку чанка
+                file_chunk[bytes_read] = '\0';
 
                 char chunk_response[BUFFER_SIZE];
-                // Форматируем пакет: CHUNKS_GET:имя_файла|текст_порции
                 sprintf(chunk_response, "CHUNKS_GET:%s|%s", filename, file_chunk);
                 send_response(client_slot, chunk_response);
 
                 total_bytes_sent += bytes_read;
 
-                // КРИТИЧЕСКИ ВАЖНО: Пауза, чтобы клиентский Mailslot успевал вычитывать пакеты 
-                // и они не склеивались в буфере Windows
                 Sleep(30);
             }
             CloseHandle(hFile);
 
-            // В) Сигнализируем о полном завершении передачи
             char end_response[BUFFER_SIZE];
             sprintf(end_response, "END_GET:%s", filename);
             send_response(client_slot, end_response);
