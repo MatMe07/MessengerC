@@ -106,16 +106,18 @@ DWORD WINAPI response_listener(LPVOID lpParam) {
                     fflush(stdout);
                     continue;
                 }
-
+                // А) Сервер сообщает о начале передачи файла
                 else if (strncmp(receive_buffer, "START_GET:", 10) == 0) {
                     char* filename = receive_buffer + 10;
 
+                    // Создаем новый пустой файл (или затираем старый)
                     HANDLE hFile = CreateFileA(filename, GENERIC_WRITE, 0, NULL,
                         CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
                     if (hFile != INVALID_HANDLE_VALUE) {
                         CloseHandle(hFile);
                     }
                 }
+                // Б) Сервер прислал очередной кусочек (чанк) данных
                 else if (strncmp(receive_buffer, "CHUNKS_GET:", 11) == 0) {
                     char* file_part = receive_buffer + 11;
                     char* pipe_separator = strchr(file_part, '|');
@@ -125,6 +127,7 @@ DWORD WINAPI response_listener(LPVOID lpParam) {
                         char* filename = file_part;
                         char* content_chunk = pipe_separator + 1;
 
+                        // Открываем файл в режиме добавления данных в конец (FILE_APPEND_DATA)
                         HANDLE hFile = CreateFileA(filename, FILE_APPEND_DATA, FILE_SHARE_READ, NULL,
                             OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 
@@ -135,6 +138,7 @@ DWORD WINAPI response_listener(LPVOID lpParam) {
                         }
                     }
                 }
+                // В) Сервер завершил передачу файла
                 else if (strncmp(receive_buffer, "END_GET:", 8) == 0) {
                     char* filename = receive_buffer + 8;
                     char self_log_buf[BUFFER_SIZE];
