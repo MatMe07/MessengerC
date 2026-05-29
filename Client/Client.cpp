@@ -106,7 +106,47 @@ DWORD WINAPI response_listener(LPVOID lpParam) {
                     fflush(stdout);
                     continue;
                 }
+                // А) Сервер сообщает о начале передачи файла
+                else if (strncmp(receive_buffer, "START_GET:", 10) == 0) {
+                    char* filename = receive_buffer + 10;
 
+                    // Создаем новый пустой файл (или затираем старый)
+                    HANDLE hFile = CreateFileA(filename, GENERIC_WRITE, 0, NULL,
+                        CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+                    if (hFile != INVALID_HANDLE_VALUE) {
+                        CloseHandle(hFile);
+                    }
+                }
+                // Б) Сервер прислал очередной кусочек (чанк) данных
+                else if (strncmp(receive_buffer, "CHUNKS_GET:", 11) == 0) {
+                    char* file_part = receive_buffer + 11;
+                    char* pipe_separator = strchr(file_part, '|');
+
+                    if (pipe_separator) {
+                        *pipe_separator = '\0';
+                        char* filename = file_part;
+                        char* content_chunk = pipe_separator + 1;
+
+                        // Открываем файл в режиме добавления данных в конец (FILE_APPEND_DATA)
+                        HANDLE hFile = CreateFileA(filename, FILE_APPEND_DATA, FILE_SHARE_READ, NULL,
+                            OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+
+                        if (hFile != INVALID_HANDLE_VALUE) {
+                            DWORD written;
+                            WriteFile(hFile, content_chunk, (DWORD)strlen(content_chunk), &written, NULL);
+                            CloseHandle(hFile);
+                        }
+                    }
+                }
+                // В) Сервер завершил передачу файла
+                else if (strncmp(receive_buffer, "END_GET:", 8) == 0) {
+                    char* filename = receive_buffer + 8;
+                    char self_log_buf[BUFFER_SIZE];
+
+                    sprintf(self_log_buf, "[Система] Файл '%s' полностью скачан с сервера и собран.\n", filename);
+                    write_to_local_history(self_log_buf);
+                    printf("\n%s> ", self_log_buf);
+                }
                 else if (strncmp(receive_buffer, "REG_OK:", 7) != 0) {
                     write_to_local_history(receive_buffer);
 
@@ -174,7 +214,7 @@ int main() {
         Sleep(100);
         timeout_counter++;
 
-        if (timeout_counter >= 50) {
+        if (timeout_counter >= 100) {
             printf("\n[КРИТИЧЕСКАЯ ОШИБКА] Сервер '%s' не ответил на запрос!\n", serverHostName);
             printf("Узел недоступен, либо введен неверный Host Name.\n");
             CloseHandle(hMyMailslot);
