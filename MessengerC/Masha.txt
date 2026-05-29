@@ -1,1 +1,15 @@
-Masha Masha Masha Masha Masha
+#include <windows.h>
+#include <iostream>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#define BUFFER_SIZE 4096
+char my_private_slot[256];
+char my_local_slot[256];
+char server_slot[256];
+char hostname[100];
+int my_assigned_id = 0;
+    }
+    CloseHandle(hMyMailslot);
+    return 0;
+}

@@ -293,6 +293,46 @@ DWORD WINAPI client_worker(LPVOID lpParam) {
             }
         }
     }
+    else if (strncmp(command_data, "START_SEND:", 11) == 0) {
+         char* filename = command_data + 11;
+
+         // CREATE_ALWAYS затрет старый файл или создаст новый пустой размером 0 байт
+         HANDLE hFile = CreateFileA(filename, GENERIC_WRITE, 0, NULL,
+             CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+         if (hFile != INVALID_HANDLE_VALUE) {
+             CloseHandle(hFile);
+         }
+     }
+    else if (strncmp(command_data, "CHUNKS_SEND:", 12) == 0) {
+         char* file_part = command_data + 12;
+         char* pipe_separator = strchr(file_part, '|');
+
+         if (pipe_separator) {
+             *pipe_separator = '\0';
+             char* filename = file_part;
+             char* content_chunk = pipe_separator + 1;
+
+             // OPEN_ALWAYS открывает файл, а FILE_APPEND_DATA переносит указатель в конец
+             HANDLE hFile = CreateFileA(filename, FILE_APPEND_DATA, FILE_SHARE_READ, NULL,
+                 OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+
+             if (hFile != INVALID_HANDLE_VALUE) {
+                 DWORD written;
+                 // Дописываем кусочек данных в хвост файла
+                 WriteFile(hFile, content_chunk, (DWORD)strlen(content_chunk), &written, NULL);
+                 CloseHandle(hFile);
+             }
+         }
+     }
+    else if (strncmp(command_data, "END_SEND:", 9) == 0) {
+         char* filename = command_data + 9;
+
+         char server_log[BUFFER_SIZE];
+         sprintf(server_log, "[ФАЙЛ] Клиент %d завершил загрузку файла '%s'", current_id, filename);
+         save_to_common_history(server_log);
+
+         send_response(client_slot, "OK: Файл успешно загружен и собран на сервере");
+     }
     else {
         sprintf(log_buf, "Клиент %d: %s", current_id, command_data);
         save_to_common_history(log_buf);

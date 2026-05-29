@@ -14,8 +14,8 @@ int my_assigned_id = 0;
 
 using namespace std;
 
-void dispatch_packet(const char* payload) {
-    HANDLE hFile = CreateFileA(server_slot, GENERIC_WRITE, FILE_SHARE_READ, NULL,
+BOOL dispatch_packet(const char* payload) {
+    HANDLE hFile = CreateFile(server_slot, GENERIC_WRITE, FILE_SHARE_READ, NULL,
         OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (hFile != INVALID_HANDLE_VALUE) {
         char raw_packet[BUFFER_SIZE];
@@ -24,9 +24,11 @@ void dispatch_packet(const char* payload) {
         DWORD bytes_written;
         WriteFile(hFile, raw_packet, (DWORD)strlen(raw_packet), &bytes_written, NULL);
         CloseHandle(hFile);
+        return TRUE; 
     }
     else {
-        printf("[ОШИБКА] Сервер почтовых ящиков недоступен в локальной сети.\n");
+        printf("[ОШИБКА] Не удалось связаться с сервером '%s'. Код: %d\n", server_slot, GetLastError());
+        return FALSE;
     }
 }
 
@@ -89,7 +91,7 @@ DWORD WINAPI response_listener(LPVOID lpParam) {
                             DWORD written;
                             WriteFile(hFile, content, (DWORD)strlen(content), &written, NULL);
                             CloseHandle(hFile);
-                            sprintf(self_log_buf, "\n[Система] Файл '%s' получен от сервера (%d байт)\n> ", filename, written);
+                            sprintf(self_log_buf, "[Система] Файл '%s' получен от сервера (%d байт)\n> ", filename, written);
                             printf(self_log_buf);
 
                         }
@@ -128,15 +130,22 @@ int main() {
     SetConsoleOutputCP(1251);
     clear_history();
     char serverHostName[100];
+    char* newline;
 
     printf("Введите Host Name сервера > ");
-    cin >> serverHostName;
+    //cin >> serverHostName;
+    fgets(serverHostName, sizeof(serverHostName), stdin);
+    newline = strchr(serverHostName, '\n');
+    if (newline) *newline = '\0';
+
     sprintf(server_slot, "\\\\%s\\mailslot\\server_main", serverHostName);
 
     int CurrProcessId = (int)GetCurrentProcessId();
     printf("Введите свой Host Name > ");
-    cin >> hostname;
-
+    fgets(hostname, sizeof(hostname), stdin);
+    //cin >> hostname;
+    newline = strchr(hostname, '\n');
+    if (newline) *newline = '\0';
 
     sprintf(my_local_slot, "\\\\.\\mailslot\\client_");
 
@@ -157,6 +166,23 @@ int main() {
 
     CreateThread(NULL, 0, response_listener, (LPVOID)hMyMailslot, 0, NULL);
 
+    dispatch_packet("PING_INIT");
+    printf("[Система] Синхронизация с сервером... Ожидание подтверждения сети...\n");
+
+    int timeout_counter = 0;
+    while (my_assigned_id == 0) {
+        Sleep(100);
+        timeout_counter++;
+
+        if (timeout_counter >= 50) {
+            printf("\n[КРИТИЧЕСКАЯ ОШИБКА] Сервер '%s' не ответил на запрос!\n", serverHostName);
+            printf("Узел недоступен, либо введен неверный Host Name.\n");
+            CloseHandle(hMyMailslot);
+            system("pause");
+            return 1;
+        }
+    }
+
     dispatch_packet("MSG:Зарегистрирован новый терминал клиента.");
 
     printf("Ваш уникальный почтовый ящик: %s\n", my_private_slot);
@@ -173,7 +199,9 @@ int main() {
     while (1) {
         printf("> ");
         fgets(console_input, BUFFER_SIZE, stdin);
-
+        if (strlen(console_input) == 0) {
+            continue; 
+        }
         size_t len = strlen(console_input);
         if (len > 0 && console_input[len - 1] == '\n') {
             console_input[len - 1] = '\0';
@@ -208,32 +236,44 @@ int main() {
             char* filename = console_input + 5;
             char self_log_buf[BUFFER_SIZE];
 
-
             HANDLE hFile = CreateFileA(filename, GENERIC_READ, FILE_SHARE_READ, NULL,
                 OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 
             if (hFile != INVALID_HANDLE_VALUE) {
-                char file_content[BUFFER_SIZE - 100];
+                char start_packet[BUFFER_SIZE];
+                sprintf(start_packet, "START_SEND:%s", filename);
+                dispatch_packet(start_packet);
+                Sleep(20); 
+
+                char file_chunk[1024];
                 DWORD bytes_read;
+                DWORD total_bytes_sent = 0;
 
-                if (ReadFile(hFile, file_content, sizeof(file_content), &bytes_read, NULL)) {
-                    file_content[bytes_read] = '\0';
+                while (ReadFile(hFile, file_chunk, sizeof(file_chunk) - 1, &bytes_read, NULL) && bytes_read > 0) {
+                    file_chunk[bytes_read] = '\0'; 
 
-                    char packet[BUFFER_SIZE];
-                    sprintf(packet, "SEND:%s|%s", filename, file_content);
-                    dispatch_packet(packet);
-                    sprintf(self_log_buf, "[Система] Файл '%s' отправлен на сервер (%d байт)\n", filename, bytes_read);
-                    write_to_local_history(self_log_buf);
-                    printf(self_log_buf);
-                    //printf("[Система] Файл '%s' отправлен на сервер (%d байт)\n", filename, bytes_read);
+                    char chunk_packet[BUFFER_SIZE];
+                    sprintf(chunk_packet, "CHUNKS_SEND:%s|%s", filename, file_chunk);
+                    dispatch_packet(chunk_packet);
+
+                    total_bytes_sent += bytes_read;
+
+                    Sleep(30);
                 }
                 CloseHandle(hFile);
+
+                char end_packet[BUFFER_SIZE];
+                sprintf(end_packet, "END_SEND:%s", filename);
+                dispatch_packet(end_packet);
+
+                sprintf(self_log_buf, "[Система] Файл '%s' успешно отправлен по частям (%d байт)\n", filename, total_bytes_sent);
+                write_to_local_history(self_log_buf);
+                printf("%s", self_log_buf);
             }
             else {
-                //printf("[Ошибка] Файл '%s' не найден\n", filename);
-                sprintf(self_log_buf, "[Ошибка] Файл '%s' не найден\n", filename);
+                sprintf(self_log_buf, "[Ошибка] Файл '%s' не найден на клиенте\n", filename);
                 write_to_local_history(self_log_buf);
-                printf(self_log_buf);
+                printf("%s", self_log_buf);
             }
             continue;
         }
